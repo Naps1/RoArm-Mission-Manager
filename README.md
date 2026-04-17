@@ -2,7 +2,8 @@
 
 A browser-based mission file editor for the [Waveshare RoArm-M2-S](https://www.waveshare.com/wiki/RoArm-M2-S) robotic arm. Connects over USB serial (UART), reads mission files stored on the arm's ESP32 flash, and lets you create, edit, duplicate and run them without touching a serial terminal.
 
-![Dark mode UI showing mission list and step editor](https://placeholder)
+![Editor](screenshots/editor-dark.png)
+![Light mode](screenshots/editor-light.png)
 
 ---
 
