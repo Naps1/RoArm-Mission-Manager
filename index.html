@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RoArm Mission Manager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+<style>
+:root {
+  --mono: 'IBM Plex Mono', monospace;
+  --sans: 'IBM Plex Sans', sans-serif;
+  --radius: 6px;
+  --sidebar: 260px;
+}
+[data-theme="dark"] {
+  --bg:#0d0f12; --bg2:#13161b; --bg3:#1a1e25;
+  --border:#252a33; --border2:#30363f;
+  --text:#c9d1db; --text2:#7a8694; --text3:#3f4855;
+  --accent:#4af0a0; --accent2:#1a8f5c; --accent-bg:rgba(74,240,160,0.07);
+  --danger:#f05a4a; --danger-bg:rgba(240,90,74,0.10); --danger2:#a03326;
+  --badge-bg:#1e2530; --badge-text:#4a90c4; --badge-border:#2a3a50;
+  --act-bg:#1a1e25; --act-bg-h:#222830; --act-border:#2e3540; --act-text:#8a96a4;
+  --menu-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+[data-theme="light"] {
+  --bg:#f4f5f7; --bg2:#ffffff; --bg3:#eef0f3;
+  --border:#dde0e6; --border2:#c8cdd6;
+  --text:#1a1e27; --text2:#5a6272; --text3:#9aa0ae;
+  --accent:#0d7a50; --accent2:#0a5e3c; --accent-bg:rgba(13,122,80,0.07);
+  --danger:#c0392b; --danger-bg:rgba(192,57,43,0.08); --danger2:#922d21;
+  --badge-bg:#e8f0fb; --badge-text:#2563a8; --badge-border:#b8d0f0;
+  --act-bg:#f0f2f5; --act-bg-h:#e4e7ec; --act-border:#c8cdd6; --act-text:#4a5568;
+  --menu-shadow: 0 8px 24px rgba(0,0,0,0.15);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--sans); background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; transition: background 0.2s, color 0.2s; }
+
+/* ── Topbar ── */
+.topbar { height: 48px; background: var(--bg2); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 20px; gap: 16px; flex-shrink: 0; }
+.topbar-logo { font-family: var(--mono); font-size: 13px; font-weight: 500; color: var(--accent); letter-spacing: 0.04em; display: flex; align-items: center; gap: 8px; }
+.topbar-logo::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: pulse 2s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.35} }
+.topbar-title { font-size: 13px; color: var(--text2); font-weight: 300; }
+.topbar-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.theme-toggle { background: var(--bg3); border: 1px solid var(--border2); border-radius: 20px; cursor: pointer; width: 52px; height: 26px; position: relative; transition: background 0.2s, border-color 0.2s; flex-shrink: 0; }
+.theme-toggle::before { content: ''; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: var(--text2); transition: transform 0.2s, background 0.2s; }
+[data-theme="light"] .theme-toggle::before { transform: translateX(26px); background: var(--accent); }
+.theme-toggle-icons { position: absolute; inset: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 5px; font-size: 11px; pointer-events: none; user-select: none; }
+.conn-status { font-family: var(--mono); font-size: 11px; padding: 3px 10px; border-radius: 20px; border: 1px solid var(--border2); color: var(--text2); }
+.conn-status.ok { color: var(--accent); border-color: var(--accent2); background: var(--accent-bg); }
+.conn-status.err { color: var(--danger); border-color: var(--danger); background: var(--danger-bg); }
+.icon-btn { background: none; border: 1px solid var(--border2); border-radius: var(--radius); color: var(--text2); cursor: pointer; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 14px; transition: all 0.15s; }
+.icon-btn:hover { border-color: var(--accent2); color: var(--accent); background: var(--accent-bg); }
+.icon-btn.spinning { animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Layout ── */
+.layout { display: flex; flex: 1; overflow: hidden; }
+
+/* ── Sidebar ── */
+.sidebar { width: var(--sidebar); background: var(--bg2); border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; }
+.sidebar-head { padding: 14px 16px 10px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
+.sidebar-head-label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; color: var(--text3); text-transform: uppercase; }
+.mission-list { flex: 1; overflow-y: auto; padding: 8px; }
+.mission-list::-webkit-scrollbar { width: 4px; }
+.mission-list::-webkit-scrollbar-track { background: transparent; }
+.mission-list::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+.mission-item { display: flex; align-items: center; border-radius: var(--radius); cursor: pointer; transition: background 0.1s; margin-bottom: 2px; border: 1px solid transparent; position: relative; }
+.mission-item:hover { background: var(--bg3); }
+.mission-item.active { background: var(--accent-bg); border-color: var(--accent2); }
+.mission-item-main { flex: 1; padding: 8px 10px; min-width: 0; }
+.mission-item-name { font-family: var(--mono); font-size: 12px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mission-item.active .mission-item-name { color: var(--accent); }
+.mission-item-intro { font-size: 11px; color: var(--text2); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ── Mission ⋯ menu button — always visible ── */
+.mission-menu-btn {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  width: 26px; height: 26px;
+  margin: auto 5px auto 0;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; line-height: 1; letter-spacing: -1px;
+  color: var(--text2);
+  transition: all 0.12s;
+}
+.mission-menu-btn:hover { border-color: var(--border2); color: var(--text); background: var(--bg3); }
+.mission-item.active .mission-menu-btn { background: var(--accent-bg); border-color: var(--accent2); }
+
+/* ── Dropdown menu ── */
+.dropdown {
+  position: absolute;
+  right: 4px; top: calc(100% + 4px);
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  box-shadow: var(--menu-shadow);
+  z-index: 50;
+  min-width: 150px;
+  overflow: hidden;
+  animation: dropIn 0.12s ease;
+}
+@keyframes dropIn { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
+.dropdown-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 14px;
+  font-size: 13px; font-family: var(--sans);
+  color: var(--text2); cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+  border: none; background: none; width: 100%; text-align: left;
+}
+.dropdown-item:hover { background: var(--bg3); color: var(--text); }
+.dropdown-item.danger:hover { background: var(--danger-bg); color: var(--danger); }
+.dropdown-sep { height: 1px; background: var(--border); margin: 3px 0; }
+
+.sidebar-foot { padding: 12px; border-top: 1px solid var(--border); }
+.new-btn { width: 100%; background: none; border: 1px dashed var(--border2); border-radius: var(--radius); color: var(--text2); font-family: var(--mono); font-size: 12px; padding: 9px; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; justify-content: center; gap: 6px; }
+.new-btn:hover { border-color: var(--accent2); color: var(--accent); background: var(--accent-bg); }
+
+/* ── Main ── */
+.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--bg); }
+.empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text3); gap: 10px; }
+.empty-state-icon { font-size: 40px; opacity: 0.3; }
+.empty-state p { font-family: var(--mono); font-size: 13px; }
+
+/* ── Editor ── */
+.editor-wrap { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.editor-toolbar { padding: 12px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; flex-shrink: 0; background: var(--bg2); }
+.editor-meta { flex: 1; display: flex; align-items: center; gap: 12px; min-width: 0; }
+.meta-name { font-family: var(--mono); font-size: 14px; font-weight: 500; color: var(--accent); white-space: nowrap; }
+.meta-intro-input { flex: 1; background: var(--bg3); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text2); font-family: var(--sans); font-size: 12px; padding: 5px 10px; min-width: 0; transition: border-color 0.15s; }
+.meta-intro-input:focus { outline: none; border-color: var(--accent2); color: var(--text); }
+.step-count { font-family: var(--mono); font-size: 11px; color: var(--text3); white-space: nowrap; }
+.btn { background: none; border: 1px solid var(--border2); border-radius: var(--radius); color: var(--text2); font-family: var(--mono); font-size: 12px; padding: 6px 14px; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+.btn:hover { background: var(--bg3); color: var(--text); }
+.btn.save { border-color: var(--accent2); color: var(--accent); background: var(--accent-bg); }
+.btn.save:hover { opacity: 0.85; }
+.btn.save:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn.danger { border-color: transparent; color: var(--text3); }
+.btn.danger:hover { border-color: var(--danger); color: var(--danger); background: var(--danger-bg); }
+.editor-body { flex: 1; overflow-y: auto; padding: 16px 20px; }
+.editor-body::-webkit-scrollbar { width: 4px; }
+.editor-body::-webkit-scrollbar-track { background: transparent; }
+.editor-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* ── Step rows ── */
+.step-rows { display: flex; flex-direction: column; gap: 12px; }
+.step-row { display: flex; align-items: flex-start; gap: 8px; animation: fadeIn 0.15s ease; position: relative; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(-3px)} to{opacity:1;transform:translateY(0)} }
+@keyframes stepFlash { 0%{background:var(--accent-bg);box-shadow:0 0 0 2px var(--accent2)} 60%{background:var(--accent-bg);box-shadow:0 0 0 2px var(--accent2)} 100%{background:transparent;box-shadow:none} }
+.step-row.flash { animation: stepFlash 1.2s ease forwards; border-radius: var(--radius); }
+.step-row.drag-over-above { border-top: 2px solid var(--accent); margin-top: -2px; }
+.step-row.drag-over-below { border-bottom: 2px solid var(--accent); }
+.step-badge { flex-shrink: 0; min-width: 58px; display: flex; flex-direction: column; align-items: center; gap: 4px; padding-top: 6px; }
+.step-label { font-family: var(--mono); font-size: 10px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--badge-text); background: var(--badge-bg); border: 1px solid var(--badge-border); border-radius: 4px; padding: 2px 6px; line-height: 1.4; white-space: nowrap; user-select: none; }
+.step-drag-handle { cursor: grab; color: var(--text3); font-size: 13px; user-select: none; line-height: 1; margin-top: 1px; }
+.step-drag-handle:active { cursor: grabbing; }
+.step-body { flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.step-input { width: 100%; font-family: var(--mono); font-size: 12px; line-height: 1.6; padding: 6px 12px; background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); resize: none; overflow: hidden; min-height: 34px; transition: border-color 0.15s, background 0.15s; }
+.step-input:focus { outline: none; border-color: var(--accent2); background: var(--bg3); }
+.step-input.err { border-color: var(--danger); background: var(--danger-bg); }
+.step-input.ok { border-color: var(--accent2); }
+.step-actions { display: flex; flex-direction: row; gap: 4px; }
+.step-act { background: var(--act-bg); border: 1px solid var(--act-border); border-radius: 5px; color: var(--act-text); cursor: pointer; height: 24px; padding: 0 8px; font-size: 13px; font-weight: 500; display: flex; align-items: center; justify-content: center; transition: all 0.12s; user-select: none; white-space: nowrap; }
+.step-act:hover { background: var(--act-bg-h); border-color: var(--border2); color: var(--text); }
+.step-act:active { transform: scale(0.96); }
+.step-act.up:hover, .step-act.down:hover { border-color: var(--accent2); color: var(--accent); background: var(--accent-bg); }
+.step-act.run:hover { border-color: #c07d20; color: #f0a94a; background: rgba(240,169,74,0.10); }
+.step-act.run.running { border-color: #c07d20; color: #f0a94a; animation: pulse 0.8s ease-in-out infinite; cursor: not-allowed; }
+.step-act.del:hover { border-color: var(--danger); color: var(--danger); background: var(--danger-bg); }
+.step-act.del { margin-left: auto; }
+
+/* ── Step delete popover ── */
+.step-del-popover {
+  position: absolute;
+  right: 0; top: 0;
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  box-shadow: var(--menu-shadow);
+  padding: 10px 12px;
+  z-index: 40;
+  display: flex; align-items: center; gap: 8px;
+  animation: dropIn 0.12s ease;
+  white-space: nowrap;
+}
+.step-del-popover span { font-size: 12px; color: var(--text2); font-family: var(--sans); }
+.pop-btn { font-family: var(--mono); font-size: 11px; padding: 4px 10px; border-radius: 4px; cursor: pointer; border: 1px solid var(--border2); background: none; color: var(--text2); transition: all 0.12s; }
+.pop-btn:hover { background: var(--bg3); color: var(--text); }
+.pop-btn.confirm { border-color: var(--danger); color: var(--danger); background: var(--danger-bg); }
+.pop-btn.confirm:hover { background: var(--danger); color: #fff; }
+
+/* ── Add step ── */
+.add-step-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; padding-left: 66px; }
+.add-step-btn { background: none; border: 1px dashed var(--border); border-radius: var(--radius); color: var(--text3); font-family: var(--mono); font-size: 12px; padding: 6px 16px; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 6px; }
+.add-step-btn:hover { border-color: var(--accent2); color: var(--accent); background: var(--accent-bg); }
+
+/* ── Busy overlay ── */
+.busy-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 300;
+  align-items: center; justify-content: center;
+  flex-direction: column; gap: 14px;
+}
+.busy-overlay.show { display: flex; }
+.busy-card {
+  background: var(--bg2); border: 1px solid var(--border2);
+  border-radius: 10px; padding: 24px 32px;
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+  min-width: 200px;
+}
+.busy-spinner {
+  width: 28px; height: 28px;
+  border: 3px solid var(--border2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+.busy-label { font-family: var(--mono); font-size: 13px; color: var(--text2); }
+
+/* ── Toast ── */
+.toast-wrap { position: fixed; bottom: 20px; right: 20px; display: flex; flex-direction: column; gap: 8px; z-index: 999; pointer-events: none; }
+.toast { font-family: var(--mono); font-size: 12px; padding: 10px 16px; border-radius: var(--radius); background: var(--bg3); border: 1px solid var(--border2); color: var(--text); pointer-events: all; animation: slideIn 0.2s ease; max-width: 320px; }
+.toast.ok { border-color: var(--accent2); color: var(--accent); background: var(--accent-bg); }
+.toast.err { border-color: var(--danger); color: var(--danger); background: var(--danger-bg); }
+@keyframes slideIn { from{opacity:0;transform:translateX(12px)} to{opacity:1;transform:translateX(0)} }
+
+/* ── New mission dialog ── */
+.overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100; align-items: center; justify-content: center; }
+.overlay.show { display: flex; }
+.dialog { background: var(--bg2); border: 1px solid var(--border2); border-radius: 10px; padding: 24px; width: 380px; display: flex; flex-direction: column; gap: 14px; }
+.dialog h3 { font-family: var(--mono); font-size: 14px; font-weight: 500; color: var(--accent); }
+.dialog label { font-size: 12px; color: var(--text2); display: block; margin-bottom: 4px; }
+.dialog input, .dialog select {
+  width: 100%; background: var(--bg3);
+  border: 1px solid var(--border2); border-radius: var(--radius);
+  color: var(--text); font-family: var(--mono); font-size: 13px; padding: 8px 12px;
+  transition: border-color 0.15s;
+}
+.dialog input:focus, .dialog select:focus { outline: none; border-color: var(--accent2); }
+.dialog input.taken { border-color: var(--danger); background: var(--danger-bg); }
+.dialog-name-err { font-size: 11px; color: var(--danger); font-family: var(--mono); margin-top: 4px; min-height: 16px; display: block; }
+.dialog select option { background: var(--bg2); }
+.dialog-btns { display: flex; gap: 8px; justify-content: flex-end; }
+.dialog-sep { height: 1px; background: var(--border); }
+
+/* ── Loading bar ── */
+.loading-bar { height: 2px; background: var(--accent); width: 0; transition: width 0.3s ease; position: fixed; top: 0; left: 0; z-index: 200; }
+</style>
+</head>
+<body>
+
+<div class="loading-bar" id="loadingBar"></div>
+
+<!-- Busy overlay -->
+<div class="busy-overlay" id="busyOverlay">
+  <div class="busy-card">
+    <div class="busy-spinner"></div>
+    <div class="busy-label" id="busyLabel">please wait...</div>
+  </div>
+</div>
+
+<div class="topbar">
+  <div class="topbar-logo">ROARM</div>
+  <div class="topbar-title">Mission Manager</div>
+  <div class="topbar-right">
+    <span class="conn-status" id="connStatus">checking...</span>
+    <button class="icon-btn" id="refreshAllBtn" title="Refresh mission list" onclick="loadMissions()">↻</button>
+    <button class="theme-toggle" id="themeToggle" title="Toggle light/dark mode" onclick="toggleTheme()">
+      <span class="theme-toggle-icons"><span>🌙</span><span>☀️</span></span>
+    </button>
+  </div>
+</div>
+
+<div class="layout">
+  <div class="sidebar">
+    <div class="sidebar-head">
+      <span class="sidebar-head-label">Missions</span>
+    </div>
+    <div class="mission-list" id="missionList">
+      <div style="padding:20px;text-align:center;font-family:var(--mono);font-size:11px;color:var(--text3);">loading...</div>
+    </div>
+    <div class="sidebar-foot">
+      <button class="new-btn" onclick="showNewDialog()">＋ new mission</button>
+    </div>
+  </div>
+
+  <div class="main" id="mainPanel">
+    <div class="empty-state" id="emptyState">
+      <div class="empty-state-icon">⬡</div>
+      <p>select a mission to edit</p>
+    </div>
+
+    <div class="editor-wrap" id="editorWrap" style="display:none">
+      <div class="editor-toolbar">
+        <div class="editor-meta">
+          <div class="meta-name" id="editorMissionName"></div>
+          <input class="meta-intro-input" id="editorIntro" placeholder="mission description..." />
+          <span class="step-count" id="stepCountLabel"></span>
+        </div>
+        <button class="btn danger" onclick="confirmDeleteMission()">delete</button>
+        <button class="btn" id="playBtn" onclick="playMission()">▶ play</button>
+        <button class="btn" id="stopBtn" onclick="stopMission()" style="display:none">■ stop</button>
+        <button class="btn save" id="saveBtn" onclick="saveMission()">save to arm</button>
+      </div>
+      <div class="editor-body">
+        <div class="step-rows" id="stepRows"></div>
+        <div class="add-step-row">
+          <button class="add-step-btn" onclick="addStep()">＋ add step</button>
+          <button class="add-step-btn" onclick="loadTestSequence()" title="Replace steps with a simple test sequence">⟳ load test sequence</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- New mission dialog -->
+<div class="overlay" id="newDialog">
+  <div class="dialog">
+    <h3>new mission</h3>
+    <div>
+      <label>name (no spaces)</label>
+      <input id="newName" placeholder="mission_b" oninput="checkNewName()" />
+      <span class="dialog-name-err" id="newNameErr"></span>
+    </div>
+    <div>
+      <label>description</label>
+      <input id="newIntro" placeholder="what does this mission do?" />
+    </div>
+    <div class="dialog-sep"></div>
+    <div>
+      <label>copy steps from existing mission (optional)</label>
+      <select id="newCopyFrom">
+        <option value="">— start empty —</option>
+      </select>
+    </div>
+    <div class="dialog-btns">
+      <button class="btn" onclick="hideNewDialog()">cancel</button>
+      <button class="btn save" id="createBtn" onclick="createMission()">create</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-wrap" id="toastWrap"></div>
+
+<script>
+const API = 'http://localhost:5000';
+let missions = [];
+let activeMission = null;
+let steps = [];
+let dirty = false;
+let activeDropdown = null;  // currently open sidebar dropdown
+let activePopover = null;   // currently open step delete popover
+
+// ── Theme ──────────────────────────────────────────────────────────────────
+function toggleTheme() {
+  const html = document.documentElement;
+  html.dataset.theme = html.dataset.theme === 'dark' ? 'light' : 'dark';
+  localStorage.setItem('roarm-theme', html.dataset.theme);
+}
+(function() {
+  const saved = localStorage.getItem('roarm-theme');
+  if (saved) document.documentElement.dataset.theme = saved;
+})();
+
+// ── Busy overlay ───────────────────────────────────────────────────────────
+function setBusy(label) {
+  document.getElementById('busyLabel').textContent = label || 'please wait...';
+  document.getElementById('busyOverlay').classList.add('show');
+}
+function clearBusy() {
+  document.getElementById('busyOverlay').classList.remove('show');
+}
+
+// ── Loading bar ────────────────────────────────────────────────────────────
+function setLoading(pct) {
+  document.getElementById('loadingBar').style.width = pct + '%';
+}
+
+// ── Toast ──────────────────────────────────────────────────────────────────
+function toast(msg, type = 'info', duration = 3000) {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  document.getElementById('toastWrap').appendChild(el);
+  setTimeout(() => el.remove(), duration);
+}
+
+// ── Connection status ──────────────────────────────────────────────────────
+function setConnStatus(ok, msg) {
+  const el = document.getElementById('connStatus');
+  el.textContent = msg;
+  el.className = 'conn-status ' + (ok ? 'ok' : 'err');
+}
+
+// ── Load mission list ──────────────────────────────────────────────────────
+async function loadMissions() {
+  const btn = document.getElementById('refreshAllBtn');
+  btn.classList.add('spinning');
+  setLoading(20);
+  try {
+    const r = await fetch(`${API}/api/missions`);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    missions = await r.json();
+    setConnStatus(true, 'connected');
+    renderSidebar();
+    setLoading(100);
+    setTimeout(() => setLoading(0), 400);
+  } catch(e) {
+    setConnStatus(false, 'no connection');
+    toast('Cannot reach server. Is server.py running?', 'err', 5000);
+    setLoading(0);
+  } finally {
+    btn.classList.remove('spinning');
+  }
+}
+
+// ── Render sidebar ─────────────────────────────────────────────────────────
+function renderSidebar() {
+  const list = document.getElementById('missionList');
+  if (!missions.length) {
+    list.innerHTML = '<div style="padding:20px;text-align:center;font-family:var(--mono);font-size:11px;color:var(--text3);">no missions found</div>';
+    return;
+  }
+  list.innerHTML = '';
+  missions.forEach(m => {
+    const item = document.createElement('div');
+    item.className = 'mission-item' + (activeMission === m.name ? ' active' : '');
+    item.dataset.name = m.name;
+    item.innerHTML = `
+      <div class="mission-item-main" onclick="openMission('${m.name}')">
+        <div class="mission-item-name">${m.name}</div>
+        ${m.intro ? `<div class="mission-item-intro">${m.intro}</div>` : ''}
+      </div>
+      <button class="mission-menu-btn" title="Options" onclick="event.stopPropagation(); toggleDropdown(this, '${m.name}')">···</button>`;
+    list.appendChild(item);
+  });
+}
+
+// ── Sidebar dropdown ───────────────────────────────────────────────────────
+function toggleDropdown(btn, name) {
+  closeDropdown();
+  const menu = document.createElement('div');
+  menu.className = 'dropdown';
+  menu.innerHTML = `
+    <button class="dropdown-item" onclick="closeDropdown(); showNewDialog('', '${name}')">⧉ &nbsp;Duplicate</button>
+    <div class="dropdown-sep"></div>
+    <button class="dropdown-item danger" onclick="closeDropdown(); confirmDelete('${name}')">✕ &nbsp;Delete</button>`;
+  btn.closest('.mission-item').appendChild(menu);
+  activeDropdown = menu;
+}
+function closeDropdown() {
+  if (activeDropdown) { activeDropdown.remove(); activeDropdown = null; }
+}
+document.addEventListener('click', () => { closeDropdown(); closeAllPopovers(); });
+
+// ── Open mission ───────────────────────────────────────────────────────────
+async function openMission(name) {
+  if (dirty && activeMission) {
+    if (!confirm(`Discard unsaved changes to "${activeMission}"?`)) return;
+  }
+  activeMission = name;
+  dirty = false;
+  setLoading(30);
+  setBusy('Loading mission...');
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('editorWrap').style.display = 'flex';
+  document.getElementById('editorMissionName').textContent = name + '.mission';
+  document.getElementById('editorIntro').value = '';
+  document.getElementById('stepRows').innerHTML = '';
+  renderSidebar();
+  try {
+    const r = await fetch(`${API}/api/missions/${name}`);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+    steps = [];
+    let intro = '';
+    data.lines.forEach((l, i) => {
+      try {
+        const obj = JSON.parse(l);
+        if (i === 0 && obj.name && obj.T === undefined) { intro = obj.intro || ''; return; }
+      } catch(e) {}
+      steps.push(l);
+    });
+    document.getElementById('editorIntro').value = intro;
+    renderSteps();
+    setLoading(100);
+    setTimeout(() => setLoading(0), 400);
+  } catch(e) {
+    toast(`Failed to load mission: ${e.message}`, 'err');
+    setLoading(0);
+  } finally {
+    clearBusy();
+  }
+}
+
+// ── Render steps ───────────────────────────────────────────────────────────
+function renderSteps() {
+  const container = document.getElementById('stepRows');
+  container.innerHTML = '';
+  steps.forEach((s, i) => appendStepRow(s, i));
+  updateStepCount();
+}
+
+function appendStepRow(value, index) {
+  const container = document.getElementById('stepRows');
+  const row = document.createElement('div');
+  row.className = 'step-row';
+  row.draggable = true;
+  row.dataset.index = index;
+  row.addEventListener('dragstart', onDragStart);
+  row.addEventListener('dragover', onDragOver);
+  row.addEventListener('drop', onDrop);
+  row.addEventListener('dragend', onDragEnd);
+  row.innerHTML = `
+    <div class="step-badge">
+      <span class="step-label">Step ${index + 1}</span>
+      <span class="step-drag-handle" title="drag to reorder">⠿</span>
+    </div>
+    <div class="step-body">
+      <textarea class="step-input" rows="1">${escHtml(value)}</textarea>
+      <div class="step-actions">
+        <button class="step-act run"  title="Run this step" onclick="runStep(${index})">▶ run</button>
+        <button class="step-act up"   title="Move up"       onclick="moveStep(${index}, -1)">↑</button>
+        <button class="step-act down" title="Move down"     onclick="moveStep(${index},  1)">↓</button>
+        <button class="step-act del"  title="Delete step"   onclick="requestDeleteStep(event, ${index})">× delete</button>
+      </div>
+    </div>`;
+  const ta = row.querySelector('textarea');
+  ta.addEventListener('input', () => {
+    steps[index] = ta.value;
+    autoResize(ta);
+    validateStep(ta);
+    markDirty();
+  });
+  autoResize(ta);
+  validateStep(ta);
+  container.appendChild(row);
+}
+
+function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function autoResize(ta) { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; }
+function validateStep(ta) {
+  const v = ta.value.trim();
+  if (!v) { ta.classList.remove('err','ok'); return; }
+  try { JSON.parse(v); ta.classList.remove('err'); ta.classList.add('ok'); }
+  catch(e) { ta.classList.remove('ok'); ta.classList.add('err'); }
+}
+function updateStepCount() {
+  document.getElementById('stepCountLabel').textContent = `${steps.length} step${steps.length !== 1 ? 's' : ''}`;
+}
+function markDirty() { dirty = true; updateStepCount(); }
+
+// ── Step delete popover ────────────────────────────────────────────────────
+function closeAllPopovers() {
+  document.querySelectorAll('.step-del-popover').forEach(p => p.remove());
+  activePopover = null;
+}
+
+function requestDeleteStep(e, index) {
+  e.stopPropagation();
+  closeAllPopovers();
+  const btn = e.currentTarget;
+  const row = btn.closest('.step-row');
+  const popover = document.createElement('div');
+  popover.className = 'step-del-popover';
+  popover.innerHTML = `
+    <span>Delete step ${index + 1}?</span>
+    <button class="pop-btn" onclick="closeAllPopovers()">cancel</button>
+    <button class="pop-btn confirm" onclick="closeAllPopovers(); deleteStep(${index})">delete</button>`;
+  popover.addEventListener('click', e => e.stopPropagation());
+  (row.querySelector('.step-body') || row).appendChild(popover);
+  activePopover = popover;
+}
+
+// ── Step operations ────────────────────────────────────────────────────────
+function addStep() {
+  steps.push('{"T":104,"x":0,"y":0,"z":0,"t":0,"spd":0.25}');
+  renderSteps();
+  markDirty();
+  const tas = document.querySelectorAll('.step-input');
+  const last = tas[tas.length - 1];
+  if (last) { last.focus(); last.select(); }
+}
+function deleteStep(i) { steps.splice(i, 1); renderSteps(); markDirty(); }
+function moveStep(i, dir) {
+  const j = i + dir;
+  if (j < 0 || j >= steps.length) return;
+  [steps[i], steps[j]] = [steps[j], steps[i]];
+  renderSteps();
+  markDirty();
+  // Flash the row at its new position so it's obvious where it landed
+  requestAnimationFrame(() => {
+    const rows = document.querySelectorAll('.step-row');
+    if (rows[j]) {
+      rows[j].classList.remove('flash');
+      void rows[j].offsetWidth; // force reflow to restart animation
+      rows[j].classList.add('flash');
+    }
+  });
+}
+function loadTestSequence() {
+  if (steps.length > 0 && !confirm('Replace current steps with the test sequence?')) return;
+  steps = [
+    '{"T":104,"x":150,"y":0,"z":150,"t":3.14,"spd":0.25}',
+    '{"T":111,"cmd":1000}',
+    '{"T":104,"x":150,"y":80,"z":100,"t":3.14,"spd":0.25}',
+    '{"T":111,"cmd":2000}',
+    '{"T":104,"x":150,"y":-80,"z":100,"t":3.14,"spd":0.25}',
+    '{"T":111,"cmd":2000}',
+    '{"T":104,"x":200,"y":0,"z":80,"t":3.14,"spd":0.25}',
+    '{"T":111,"cmd":2000}',
+    '{"T":104,"x":150,"y":0,"z":150,"t":3.14,"spd":0.25}',
+  ];
+  renderSteps();
+  markDirty();
+  toast('Test sequence loaded — review, then save to arm before running.', 'ok', 4000);
+}
+
+// ── Drag-and-drop ──────────────────────────────────────────────────────────
+let dragIndex = null;
+
+function clearDragStyles() {
+  document.querySelectorAll('.step-row').forEach(r => {
+    r.classList.remove('drag-over-above', 'drag-over-below');
+  });
+}
+
+function onDragStart(e) {
+  dragIndex = +e.currentTarget.dataset.index;
+  e.currentTarget.style.opacity = '0.4';
+  e.dataTransfer.effectAllowed = 'move';
+}
+
+function onDragEnd(e) {
+  e.currentTarget.style.opacity = '';
+  clearDragStyles();
+}
+
+function onDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  clearDragStyles();
+  const row = e.currentTarget;
+  const ti = +row.dataset.index;
+  if (dragIndex === null || ti === dragIndex) return;
+  // Show indicator above or below based on cursor position within the row
+  const rect = row.getBoundingClientRect();
+  const mid = rect.top + rect.height / 2;
+  if (e.clientY < mid) {
+    row.classList.add('drag-over-above');
+  } else {
+    row.classList.add('drag-over-below');
+  }
+}
+
+function onDrop(e) {
+  e.preventDefault();
+  clearDragStyles();
+  const row = e.currentTarget;
+  const ti = +row.dataset.index;
+  if (dragIndex === null || dragIndex === ti) return;
+
+  // Determine insert position (above or below target)
+  const rect = row.getBoundingClientRect();
+  const mid = rect.top + rect.height / 2;
+  let insertAt = ti;
+  if (e.clientY >= mid) insertAt = ti + 1;
+
+  const moved = steps.splice(dragIndex, 1)[0];
+  // Adjust for the removal shifting indices
+  const adjustedInsert = insertAt > dragIndex ? insertAt - 1 : insertAt;
+  steps.splice(adjustedInsert, 0, moved);
+  dragIndex = null;
+  renderSteps();
+  markDirty();
+  // Flash the dropped row
+  requestAnimationFrame(() => {
+    const rows = document.querySelectorAll('.step-row');
+    if (rows[adjustedInsert]) {
+      rows[adjustedInsert].classList.add('flash');
+    }
+  });
+}
+
+// ── Save ───────────────────────────────────────────────────────────────────
+async function saveMission() {
+  if (!activeMission) return;
+  const btn = document.getElementById('saveBtn');
+  let allValid = true;
+  document.querySelectorAll('.step-input').forEach(ta => {
+    const v = ta.value.trim();
+    if (v) { try { JSON.parse(v); } catch(e) { allValid = false; ta.classList.add('err'); } }
+  });
+  if (!allValid) { toast('Fix invalid JSON steps (shown in red) before saving.', 'err'); return; }
+  btn.disabled = true;
+  btn.textContent = 'saving...';
+  setBusy('Saving to arm...');
+  setLoading(20);
+  const intro = document.getElementById('editorIntro').value.trim();
+  const cleanSteps = steps.map(s => s.trim()).filter(s => s);
+  try {
+    const r = await fetch(`${API}/api/missions/${activeMission}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ intro, steps: cleanSteps })
+    });
+    const data = await r.json();
+    if (data.ok) {
+      dirty = false;
+      toast(`Saved ${data.steps_saved} steps to "${activeMission}"`, 'ok');
+      const m = missions.find(x => x.name === activeMission);
+      if (m) m.intro = intro;
+      renderSidebar();
+    } else {
+      toast('Save failed: ' + (data.errors || []).join(', '), 'err', 5000);
+    }
+  } catch(e) {
+    toast(`Save error: ${e.message}`, 'err');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'save to arm';
+    clearBusy();
+    setLoading(100);
+    setTimeout(() => setLoading(0), 400);
+  }
+}
+
+// ── Delete mission ─────────────────────────────────────────────────────────
+function confirmDelete(name) {
+  if (!confirm(`Delete mission "${name}"? This cannot be undone.`)) return;
+  deleteMissionByName(name);
+}
+function confirmDeleteMission() {
+  if (!activeMission) return;
+  if (!confirm(`Delete "${activeMission}"? This cannot be undone.`)) return;
+  deleteMissionByName(activeMission);
+}
+async function deleteMissionByName(name) {
+  setBusy('Deleting mission...');
+  try {
+    await fetch(`${API}/api/missions/${name}`, { method: 'DELETE' });
+    toast(`Deleted "${name}"`, 'ok');
+    missions = missions.filter(m => m.name !== name);
+    if (activeMission === name) {
+      activeMission = null; dirty = false;
+      document.getElementById('editorWrap').style.display = 'none';
+      document.getElementById('emptyState').style.display = 'flex';
+    }
+    renderSidebar();
+  } catch(e) {
+    toast(`Delete failed: ${e.message}`, 'err');
+  } finally {
+    clearBusy();
+  }
+}
+
+// ── New mission dialog ─────────────────────────────────────────────────────
+function showNewDialog(prefill = '', copyFrom = '') {
+  // Populate copy-from dropdown
+  const sel = document.getElementById('newCopyFrom');
+  sel.innerHTML = '<option value="">— start empty —</option>';
+  missions.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m.name;
+    opt.textContent = m.name;
+    if (m.name === copyFrom) opt.selected = true;
+    sel.appendChild(opt);
+  });
+  document.getElementById('newName').value = prefill ? prefill + '_copy' : '';
+  document.getElementById('newName').classList.remove('taken');
+  document.getElementById('newNameErr').textContent = '';
+  document.getElementById('newIntro').value = '';
+  document.getElementById('createBtn').disabled = false;
+  document.getElementById('newDialog').classList.add('show');
+  setTimeout(() => document.getElementById('newName').focus(), 50);
+}
+function hideNewDialog() { document.getElementById('newDialog').classList.remove('show'); }
+
+function checkNewName() {
+  const raw = document.getElementById('newName').value.trim().replace(/\s+/g,'_');
+  const err = document.getElementById('newNameErr');
+  const input = document.getElementById('newName');
+  const btn = document.getElementById('createBtn');
+  if (raw && missions.find(m => m.name === raw)) {
+    input.classList.add('taken');
+    err.textContent = 'name already taken';
+    btn.disabled = true;
+  } else {
+    input.classList.remove('taken');
+    err.textContent = '';
+    btn.disabled = false;
+  }
+}
+
+async function createMission() {
+  const name = document.getElementById('newName').value.trim().replace(/\s+/g,'_');
+  const intro = document.getElementById('newIntro').value.trim();
+  const copyFrom = document.getElementById('newCopyFrom').value;
+  if (!name) { document.getElementById('newNameErr').textContent = 'enter a name'; return; }
+  if (missions.find(m => m.name === name)) {
+    document.getElementById('newName').classList.add('taken');
+    document.getElementById('newNameErr').textContent = 'name already taken';
+    return;
+  }
+  hideNewDialog();
+  setBusy(copyFrom ? `Copying "${copyFrom}"...` : 'Creating mission...');
+  try {
+    let srcSteps = [];
+    let srcIntro = intro;
+    if (copyFrom) {
+      const r = await fetch(`${API}/api/missions/${copyFrom}`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const data = await r.json();
+      data.lines.forEach((l, i) => {
+        try {
+          const obj = JSON.parse(l);
+          if (i === 0 && obj.name && obj.T === undefined) {
+            if (!intro) srcIntro = obj.intro || '';
+            return;
+          }
+        } catch(e) {}
+        srcSteps.push(l);
+      });
+    }
+    const r = await fetch(`${API}/api/missions/${name}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ intro: srcIntro, steps: srcSteps })
+    });
+    const data = await r.json();
+    if (data.ok) {
+      missions.push({ name, intro: srcIntro });
+      renderSidebar();
+      openMission(name);
+      toast(copyFrom ? `Copied "${copyFrom}" → "${name}"` : `Created "${name}"`, 'ok');
+    }
+  } catch(e) {
+    toast(`Failed: ${e.message}`, 'err');
+  } finally {
+    clearBusy();
+  }
+}
+
+document.getElementById('newDialog').addEventListener('click', e => { if (e.target === e.currentTarget) hideNewDialog(); });
+document.getElementById('newName').addEventListener('keydown', e => { if (e.key === 'Enter') createMission(); if (e.key === 'Escape') hideNewDialog(); });
+
+// ── Run / play ─────────────────────────────────────────────────────────────
+let missionPlaying = false;
+
+async function playMission() {
+  if (!activeMission) return;
+  if (dirty) { toast('Save the mission before playing.', 'err'); return; }
+  missionPlaying = true;
+  document.getElementById('playBtn').style.display = 'none';
+  document.getElementById('stopBtn').style.display = '';
+  setBusy('Playing mission...');
+  try {
+    const r = await fetch(`${API}/api/run/mission/${activeMission}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ times: 1 })
+    });
+    const data = await r.json();
+    if (data.ok) toast(`Finished playing "${activeMission}"`, 'ok');
+    else toast(`Play failed: ${data.error || 'unknown'}`, 'err');
+  } catch(e) {
+    toast(`Play error: ${e.message}`, 'err');
+  } finally {
+    missionPlaying = false;
+    document.getElementById('playBtn').style.display = '';
+    document.getElementById('stopBtn').style.display = 'none';
+    clearBusy();
+  }
+}
+
+function stopMission() {
+  fetch(`${API}/api/run/stop`, { method: 'POST' }).catch(() => {});
+  missionPlaying = false;
+  document.getElementById('playBtn').style.display = '';
+  document.getElementById('stopBtn').style.display = 'none';
+  clearBusy();
+  toast('Stop signal sent', 'info');
+}
+
+async function runStep(index) {
+  if (!activeMission) return;
+  if (dirty) { toast('Save the mission before running steps.', 'err'); return; }
+  const stepNum = index + 1;
+  const btns = document.querySelectorAll('.step-act.run');
+  const btn = btns[index];
+  if (btn) btn.classList.add('running');
+  setBusy(`Running step ${stepNum}...`);
+  try {
+    const r = await fetch(`${API}/api/run/step/${activeMission}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stepNum })
+    });
+    const data = await r.json();
+    if (data.ok) toast(`Step ${stepNum} done`, 'ok');
+    else toast(`Step ${stepNum} failed: ${data.error || 'unknown'}`, 'err');
+  } catch(e) {
+    toast(`Step error: ${e.message}`, 'err');
+  } finally {
+    if (btn) btn.classList.remove('running');
+    clearBusy();
+  }
+}
+
+document.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); saveMission(); } });
+loadMissions();
+</script>
+</body>
+</html>
