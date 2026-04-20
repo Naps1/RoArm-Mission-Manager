@@ -49,13 +49,25 @@ echo.
 echo  Looking for RoArm (ESP32 USB-serial adapter)...
 echo.
 
-python -c ^
-"import serial.tools.list_ports, sys;" ^
-"KNOWN = [('10C4','EA60','CP210x'),('1A86','7523','CH340'),('1A86','55D4','CH9102'),('0403','6001','FTDI'),('303A','1001','ESP32-USB')];" ^
-"ports = list(serial.tools.list_ports.comports());" ^
-"matches = [(p.device, n, f'{v}:{pi}') for p in ports for v,pi,n in KNOWN if p.vid and p.pid and format(p.vid,'04X')==v and format(p.pid,'04X')==pi];" ^
-"[print(f'MATCH|{d}|{n}|{vp}') for d,n,vp in matches] if matches else [print(f'PORT|{p.device}|{p.description}|{format(p.vid,chr(48)+chr(52)+chr(88)) if p.vid else \"????\"}:{format(p.pid,chr(48)+chr(52)+chr(88)) if p.pid else \"????\"}') for p in ports] or print('NONE')" ^
-> "%TEMP%\roarm_detect.txt" 2>nul
+:: Write detection script to a temp file (avoids broken multiline -c syntax)
+(
+    echo import serial.tools.list_ports
+    echo KNOWN = [('10C4','EA60','CP210x'),('1A86','7523','CH340'),('1A86','55D4','CH9102'),('0403','6001','FTDI'),('303A','1001','ESP32-USB')]
+    echo ports = list(serial.tools.list_ports.comports())
+    echo matches = [(p.device, n, '%s:%s' %% (format(p.vid,'04X'), format(p.pid,'04X'))) for p in ports for v,pi,n in KNOWN if p.vid and p.pid and format(p.vid,'04X')==v and format(p.pid,'04X')==pi]
+    echo if matches:
+    echo     for d,n,vp in matches: print('MATCH|' + d + '|' + n + '|' + vp)
+    echo elif ports:
+    echo     for p in ports:
+    echo         vid = format(p.vid,'04X') if p.vid else '????'
+    echo         pid = format(p.pid,'04X') if p.pid else '????'
+    echo         print('PORT|' + p.device + '|' + p.description + '|' + vid + ':' + pid)
+    echo else:
+    echo     print('NONE')
+) > "%TEMP%\roarm_detect.py"
+
+python "%TEMP%\roarm_detect.py" > "%TEMP%\roarm_detect.txt" 2>nul
+del "%TEMP%\roarm_detect.py" >nul 2>&1
 
 :: Read results
 set AUTO_PORT=
@@ -81,7 +93,7 @@ if defined AUTO_PORT (
 ) else (
     echo.
     echo  Could not identify the arm automatically.
-    set /p COMPORT= Enter COM port manually (e.g. COM3): 
+    set /p COMPORT= Enter COM port manually (e.g. COM3):
     set AUTO_VIDPID=
 )
 del "%TEMP%\roarm_detect.txt" >nul 2>&1
@@ -89,40 +101,45 @@ del "%TEMP%\roarm_detect.txt" >nul 2>&1
 :: ── Write launch.bat ──────────────────────────────────────────────────────────
 echo.
 echo  Writing launch.bat...
-echo @echo off                                                   > "%~dp0launch.bat"
-echo title RoArm Mission Manager                               >> "%~dp0launch.bat"
-echo color 0A                                                   >> "%~dp0launch.bat"
-echo echo.                                                      >> "%~dp0launch.bat"
-echo echo  RoArm Mission Manager                               >> "%~dp0launch.bat"
-echo echo.                                                      >> "%~dp0launch.bat"
+(
+    echo @echo off
+    echo title RoArm Mission Manager
+    echo color 0A
+    echo echo.
+    echo echo  RoArm Mission Manager
+    echo echo.
+) > "%~dp0launch.bat"
 
 if defined AUTO_VIDPID (
-    :: Write auto-detect block
-    echo set VIDPID=%AUTO_VIDPID%                              >> "%~dp0launch.bat"
-    echo echo  Locating arm by USB ID (%AUTO_VIDPID%^)...      >> "%~dp0launch.bat"
     (
+        echo set VIDPID=%AUTO_VIDPID%
+        echo echo  Locating arm by USB ID ^(%AUTO_VIDPID%^)...
         echo python -c "import serial.tools.list_ports,sys; vid,pid=[int(x,16) for x in '%AUTO_VIDPID%'.split(':')]; r=[p.device for p in serial.tools.list_ports.comports() if p.vid==vid and p.pid==pid]; print(r[0] if r else '')" ^> %%TEMP%%\roarm_port.txt
+        echo set /p COMPORT=^<%%TEMP%%\roarm_port.txt
+        echo del %%TEMP%%\roarm_port.txt ^>nul 2^>^&1
+        echo if "%%COMPORT%%"=="" ^(
+        echo     echo  [ERROR] Arm not found. Check USB cable.
+        echo     pause
+        echo     exit /b 1
+        echo ^)
+        echo echo  [OK] Found arm on %%COMPORT%%
     ) >> "%~dp0launch.bat"
-    echo set /p COMPORT=^<%%TEMP%%\roarm_port.txt              >> "%~dp0launch.bat"
-    echo del %%TEMP%%\roarm_port.txt ^>nul 2^>^&1              >> "%~dp0launch.bat"
-    echo if "%%COMPORT%%"=="" (                                 >> "%~dp0launch.bat"
-    echo     echo  [ERROR] Arm not found. Check USB cable.     >> "%~dp0launch.bat"
-    echo     pause                                              >> "%~dp0launch.bat"
-    echo     exit /b 1                                         >> "%~dp0launch.bat"
-    echo )                                                      >> "%~dp0launch.bat"
-    echo echo  [OK] Found arm on %%COMPORT%%                   >> "%~dp0launch.bat"
 ) else (
-    echo set COMPORT=%COMPORT%                                  >> "%~dp0launch.bat"
-    echo echo  Using port: %COMPORT%                           >> "%~dp0launch.bat"
+    (
+        echo set COMPORT=%COMPORT%
+        echo echo  Using port: %COMPORT%
+    ) >> "%~dp0launch.bat"
 )
 
-echo echo.                                                      >> "%~dp0launch.bat"
-echo echo  Open browser at: http://localhost:5000               >> "%~dp0launch.bat"
-echo echo  Press Ctrl+C here to stop.                          >> "%~dp0launch.bat"
-echo echo.                                                      >> "%~dp0launch.bat"
-echo start "" http://localhost:5000                             >> "%~dp0launch.bat"
-echo python "%~dp0server.py" --port %%COMPORT%%                >> "%~dp0launch.bat"
-echo pause                                                      >> "%~dp0launch.bat"
+(
+    echo echo.
+    echo echo  Open browser at: http://localhost:5000
+    echo echo  Press Ctrl+C here to stop.
+    echo echo.
+    echo start "" http://localhost:5000
+    echo python "%~dp0server.py" --port %%COMPORT%%
+    echo pause
+) >> "%~dp0launch.bat"
 
 echo.
 echo  =============================================
