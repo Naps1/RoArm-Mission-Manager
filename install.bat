@@ -22,18 +22,28 @@ for /f "tokens=*" %%i in ('python --version 2^>^&1') do set PYVER=%%i
 echo  [OK] Found %PYVER%
 echo.
 
-:: ── Install pyserial ──────────────────────────────────────────────────────────
+:: ── Install pyserial (skip if already installed) ────────────────────────────
+echo  Checking pyserial...
+python -c "import serial" >nul 2>&1
+if not errorlevel 1 (
+    echo  [OK] pyserial already installed
+    echo.
+    goto :detect
+)
 echo  Installing pyserial...
 python -m pip install pyserial --quiet
 if errorlevel 1 (
     echo.
     echo  [ERROR] Failed to install pyserial.
-    echo  Try running this script as Administrator.
+    echo  Try running this script as Administrator, or install manually:
+    echo    pip install -r requirements.txt
     pause
     exit /b 1
 )
 echo  [OK] pyserial installed
 echo.
+
+:detect
 
 :: ── Detect arm by USB VID:PID ─────────────────────────────────────────────────
 echo  Looking for RoArm (ESP32 USB-serial adapter)...

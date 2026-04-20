@@ -30,7 +30,10 @@ A browser-based mission file editor for the [Waveshare RoArm-M2-S](https://www.w
 ## Requirements
 
 - Python 3.7 or newer
-- [pyserial](https://pypi.org/project/pyserial/) (`pip install pyserial`)
+- [pyserial](https://pypi.org/project/pyserial/) — installed automatically by the setup scripts, or manually:
+  ```bash
+  pip install -r requirements.txt
+  ```
 - RoArm-M2-S connected via USB, running stock firmware at 115200 baud
 
 ---

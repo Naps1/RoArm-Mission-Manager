@@ -39,12 +39,22 @@ if [ -z "$PYTHON" ]; then
     exit 1
 fi
 
-# ── Install pyserial ──────────────────────────────────────────────────────────
+# ── Install pyserial (skip if already installed) ──────────────────────────────
 echo ""
-echo " Installing pyserial..."
-"$PYTHON" -m pip install pyserial --quiet --break-system-packages 2>/dev/null \
-    || "$PYTHON" -m pip install pyserial --quiet
-echo " [OK] pyserial installed"
+echo " Checking pyserial..."
+if "$PYTHON" -c "import serial" &>/dev/null; then
+    echo " [OK] pyserial already installed"
+else
+    echo " Installing pyserial..."
+    "$PYTHON" -m pip install pyserial --quiet --break-system-packages 2>/dev/null \
+        || "$PYTHON" -m pip install pyserial --quiet
+    if ! "$PYTHON" -c "import serial" &>/dev/null; then
+        echo " [ERROR] Failed to install pyserial."
+        echo "         Try manually: pip install -r requirements.txt"
+        exit 1
+    fi
+    echo " [OK] pyserial installed"
+fi
 
 # ── Detect serial ports ───────────────────────────────────────────────────────
 echo ""
