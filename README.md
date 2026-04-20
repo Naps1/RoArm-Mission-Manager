@@ -40,14 +40,16 @@ A browser-based mission file editor for the [Waveshare RoArm-M2-S](https://www.w
 
 ## Installation
 
-### Windows
+### Using the install script (recommended)
+
+#### Windows
 
 1. Install [Python 3.7+](https://www.python.org/downloads/) — check **"Add Python to PATH"** during setup
 2. Connect the arm via USB
 3. Double-click **`install.bat`**
 4. Follow the prompts — it detects your COM port by USB hardware ID and writes `launch.bat`
 
-### Linux / macOS
+#### Linux / macOS
 
 1. Connect the arm via USB
 2. Open a terminal in this folder and run:
@@ -58,6 +60,38 @@ A browser-based mission file editor for the [Waveshare RoArm-M2-S](https://www.w
 3. Follow the prompts — it detects your port and writes `launch.sh`
 
 > **Linux note:** If you get `Permission denied` on the serial port, the installer will offer to add you to the `dialout` group. You need to log out and back in once for this to take effect.
+
+### Manual setup
+
+If you prefer not to use the install scripts:
+
+1. Install pyserial:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. Find your serial port:
+   - **Windows:** Device Manager → Ports (COM & LPT) — look for CP210x, CH340, or similar USB-serial adapter
+   - **Linux:** `ls /dev/ttyUSB*` or `ls /dev/ttyACM*`
+   - **macOS:** `ls /dev/tty.usbserial*` or `ls /dev/cu.usbserial*`
+
+3. Run the server directly:
+   ```bash
+   python server.py --port /dev/ttyUSB0        # Linux
+   python server.py --port /dev/tty.usbserial-0001  # macOS
+   python server.py --port COM3                # Windows
+   ```
+
+4. Open `http://localhost:5000` in your browser.
+
+Optional arguments:
+```
+--port        Serial port (default: /dev/ttyUSB0)
+--baud        Baud rate (default: 115200)
+--http-port   Local server port (default: 5000)
+```
+
+> **Linux note:** If you get `Permission denied` on the serial port, run `sudo usermod -aG dialout $USER` and log out and back in.
 
 ---
 
