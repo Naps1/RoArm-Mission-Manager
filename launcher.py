@@ -86,7 +86,8 @@ class App(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("RoArm Mission Manager")
-        self.resizable(False, False)
+        self.resizable(True, True)
+        self.geometry("680x520")
         self.configure(bg=BG)
 
         self._server_proc: subprocess.Popen[str] | None = None
@@ -235,7 +236,7 @@ class App(tk.Tk):
         self._log.tag_config("cmd", foreground=TXT2)
 
         self.update_idletasks()
-        self.minsize(540, 420)
+        self.minsize(420, 400)
 
     # ── Ports ──────────────────────────────────────────────────────────────────
     def _refresh_ports(self):
