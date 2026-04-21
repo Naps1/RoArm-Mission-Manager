@@ -13,7 +13,7 @@ import time
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse
 
 try:
     import serial
@@ -25,7 +25,7 @@ BAUD = 115200
 SCRIPT_DIR = Path(__file__).parent
 UI_FILE = SCRIPT_DIR / "index.html"
 
-ser = None
+ser: "serial.Serial | None" = None
 ser_lock = threading.Lock()
 
 
@@ -33,12 +33,14 @@ ser_lock = threading.Lock()
 # Serial helpers
 # ---------------------------------------------------------------------------
 
+
 def send_cmd(cmd: dict, timeout: float = 5.0) -> str:
     """Send a JSON command and return the raw response string.
 
     Reads until the port has been silent for IDLE_S seconds,
     or until `timeout` seconds have elapsed overall.
     """
+    assert ser is not None, "Serial port not open"
     IDLE_S = 0.15  # stop after 150 ms of silence
     with ser_lock:
         ser.reset_input_buffer()
@@ -164,7 +166,7 @@ def save_mission(name: str, intro: str, steps: list[str]) -> dict:
         try:
             step_str = json.dumps(json.loads(step), separators=(",", ":"))
         except json.JSONDecodeError as e:
-            errors.append(f"Step {i+1} invalid JSON: {e}")
+            errors.append(f"Step {i + 1} invalid JSON: {e}")
             continue
         send_cmd({"T": 222, "name": name, "step": step_str})
         time.sleep(0.15)
@@ -221,15 +223,16 @@ def stop_mission() -> dict:
 # HTTP handler
 # ---------------------------------------------------------------------------
 
+
 class Handler(BaseHTTPRequestHandler):
-    def log_message(self, fmt, *args):
-        print(f"  {self.address_string()} {fmt % args}")
+    def log_message(self, format, *args):  # noqa: A002
+        print(f"  {self.address_string()} {format % args}")
 
     def send_json(self, data, status=200):
         body = json.dumps(data).encode()
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", len(body))
+        self.send_header("Content-Length", str(len(body)))
         self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
         self.wfile.write(body)
@@ -238,7 +241,7 @@ class Handler(BaseHTTPRequestHandler):
         body = path.read_bytes()
         self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
-        self.send_header("Content-Length", len(body))
+        self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
 
@@ -266,7 +269,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({"error": str(e)}, 500)
 
         elif path.startswith("/api/missions/"):
-            name = path[len("/api/missions/"):]
+            name = path[len("/api/missions/") :]
             try:
                 lines = read_file_lines(name)
                 self.send_json({"name": name, "lines": lines})
@@ -283,7 +286,7 @@ class Handler(BaseHTTPRequestHandler):
         body = json.loads(self.rfile.read(length)) if length else {}
 
         if path.startswith("/api/missions/"):
-            name = path[len("/api/missions/"):]
+            name = path[len("/api/missions/") :]
             intro = body.get("intro", "")
             steps = body.get("steps", [])
             try:
@@ -292,7 +295,7 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as e:
                 self.send_json({"error": str(e)}, 500)
         elif path.startswith("/api/run/mission/"):
-            name = path[len("/api/run/mission/"):]
+            name = path[len("/api/run/mission/") :]
             times = body.get("times", 1)
             try:
                 self.send_json(run_mission(name, times))
@@ -306,7 +309,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_json({"error": str(e)}, 500)
 
         elif path.startswith("/api/run/step/"):
-            name = path[len("/api/run/step/"):]
+            name = path[len("/api/run/step/") :]
             step_num = body.get("stepNum")
             if step_num is None:
                 self.send_json({"error": "stepNum required"}, 400)
@@ -323,7 +326,7 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         path = parsed.path.rstrip("/")
         if path.startswith("/api/missions/"):
-            name = path[len("/api/missions/"):]
+            name = path[len("/api/missions/") :]
             try:
                 self.send_json(delete_mission(name))
             except Exception as e:
@@ -336,9 +339,12 @@ class Handler(BaseHTTPRequestHandler):
 # Entry point
 # ---------------------------------------------------------------------------
 
+
 def main():
     parser = argparse.ArgumentParser(description="RoArm-M2-S Mission Manager bridge")
-    parser.add_argument("--port", default="/dev/ttyUSB0", help="Serial port (e.g. COM3 or /dev/ttyUSB0)")
+    parser.add_argument(
+        "--port", default="/dev/ttyUSB0", help="Serial port (e.g. COM3 or /dev/ttyUSB0)"
+    )
     parser.add_argument("--baud", type=int, default=BAUD)
     parser.add_argument("--http-port", type=int, default=5000)
     args = parser.parse_args()
