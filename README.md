@@ -22,14 +22,14 @@ A browser-based mission file editor for the [Waveshare RoArm-M2-S](https://www.w
 - **Delete missions** — with confirmation
 - **Test sequence** — built-in conservative movement sequence for first-time testing
 - **Light / dark mode** — toggle in the toolbar, preference saved between sessions
-- **Auto COM port detection** (Windows) — finds the arm by USB hardware ID even if the port number changes
+- **Auto serial port detection** — known ESP32/CH340/CP210x adapters listed first; refreshable dropdown
 - **Busy overlay** — spinner with status text during any operation that takes a moment
 
 ---
 
 ## Requirements
 
-- Python 3.7 or newer
+- Python 3.9 or newer
 - [pyserial](https://pypi.org/project/pyserial/) — installed automatically by the setup scripts, or manually:
   ```bash
   pip install -r requirements.txt
@@ -40,49 +40,48 @@ A browser-based mission file editor for the [Waveshare RoArm-M2-S](https://www.w
 
 ## Installation
 
-### Using the install script (recommended)
-
-#### Windows
+### Windows
 
 1. Install [Python 3.7+](https://www.python.org/downloads/) — check **"Add Python to PATH"** during setup
-2. Connect the arm via USB
-3. Double-click **`install.bat`**
-4. Follow the prompts — it detects your COM port by USB hardware ID and writes `launch.bat`
+2. Double-click **`install.bat`** — it checks Python, installs pyserial if needed, and launches the GUI
 
-#### Linux / macOS
+After the first run, you can launch directly with:
+```
+python launcher.py
+```
 
-1. Connect the arm via USB
-2. Open a terminal in this folder and run:
+### Linux / macOS
+
+1. Open a terminal in this folder and run:
    ```bash
    chmod +x install.sh
    ./install.sh
    ```
-3. Follow the prompts — it detects your port and writes `launch.sh`
+2. This installs dependencies, handles serial port permissions, and launches the GUI
 
-> **Linux note:** If you get `Permission denied` on the serial port, the installer will offer to add you to the `dialout` group. You need to log out and back in once for this to take effect.
+After the first run, you can launch directly with:
+```bash
+python launcher.py
+```
 
-### Manual setup
+> **Linux note:** If you get `Permission denied` on the serial port, run `sudo usermod -aG dialout $USER` and log out and back in.
 
-If you prefer not to use the install scripts:
+### Manual dependency install
 
-1. Install pyserial:
-   ```bash
-   pip install -r requirements.txt
-   ```
+```bash
+pip install -r requirements.txt
+python launcher.py
+```
 
-2. Find your serial port:
-   - **Windows:** Device Manager → Ports (COM & LPT) — look for CP210x, CH340, or similar USB-serial adapter
-   - **Linux:** `ls /dev/ttyUSB*` or `ls /dev/ttyACM*`
-   - **macOS:** `ls /dev/tty.usbserial*` or `ls /dev/cu.usbserial*`
+### Running the server directly (no GUI)
 
-3. Run the server directly:
-   ```bash
-   python server.py --port /dev/ttyUSB0        # Linux
-   python server.py --port /dev/tty.usbserial-0001  # macOS
-   python server.py --port COM3                # Windows
-   ```
+```bash
+python server.py --port /dev/ttyUSB0        # Linux
+python server.py --port /dev/tty.usbserial-0001  # macOS
+python server.py --port COM3                # Windows
+```
 
-4. Open `http://localhost:5000` in your browser.
+Then open `http://localhost:5000` in your browser.
 
 Optional arguments:
 ```
@@ -91,21 +90,15 @@ Optional arguments:
 --http-port   Local server port (default: 5000)
 ```
 
-> **Linux note:** If you get `Permission denied` on the serial port, run `sudo usermod -aG dialout $USER` and log out and back in.
-
 ---
 
 ## Usage
 
 ### Starting the server
 
-**Windows:** double-click `launch.bat`
+Run `python launcher.py` (or use the install scripts which launch it automatically).
 
-**macOS:** double-click `Launch RoArm Manager.command` in Finder, or run `./launch.sh`
-
-**Linux:** run `./launch.sh` in a terminal
-
-The browser opens automatically at `http://localhost:5000`. The terminal window must stay open while you're using the tool — it's the bridge between the browser and the arm.
+Click **▶ Start server** to connect, then **🌐 Open browser** to open the UI. The launcher window must stay open while you're using the tool — it's the bridge between the browser and the arm.
 
 ### Editor workflow
 
@@ -131,10 +124,60 @@ Open or create a mission, then click **⟳ load test sequence** at the bottom of
 |---|---|
 | `server.py` | Python UART bridge + HTTP API server |
 | `index.html` | Browser UI (served by `server.py`) |
-| `install.bat` | Windows one-time setup — creates `launch.bat` |
-| `install.sh` | Linux/macOS one-time setup — creates `launch.sh` |
+| `launcher.py` | Cross-platform GUI launcher (optional, see below) |
+| `RoArmManager.spec` | PyInstaller build spec for the `.exe` |
+| `install.bat` | Windows setup — installs dependencies and launches the GUI |
+| `install.sh` | Linux/macOS setup — installs dependencies and launches the GUI |
+| `requirements.txt` | Python dependencies |
 
-`launch.bat` / `launch.sh` are generated by the install scripts and are not committed to the repo.
+
+---
+
+## GUI launcher
+
+`launcher.py` is an optional graphical launcher for users who prefer not to use the command line. It works on Windows, Linux, and macOS, and provides:
+
+- Serial port dropdown — auto-populated and refreshable, known ESP32 adapters shown first
+- **▶ Start server** / **■ Stop server** buttons
+- **🌐 Open browser** button — enabled once the server is running
+- Live server log with colour-coded output
+
+### Requirements
+
+The launcher uses `tkinter`, which is included with Python on Windows and macOS. On Linux it may need to be installed separately:
+
+```bash
+# Debian / Ubuntu
+sudo apt install python3-tk
+
+# Fedora
+sudo dnf install python3-tkinter
+
+# Arch
+sudo pacman -S tk
+```
+
+### Running from source
+
+```bash
+pip install -r requirements.txt
+python launcher.py
+```
+
+### Building a standalone executable (Windows)
+
+The `.exe` bundles Python, `server.py`, `index.html`, and all dependencies into a single file — users need nothing else installed.
+
+```bash
+pip install pyinstaller
+pyinstaller RoArmManager.spec
+```
+
+Output: `dist/RoArmManager.exe`
+
+> **Note:** PyInstaller executables are sometimes flagged by antivirus software as a false positive. This is a known PyInstaller issue. If needed, add an exclusion for the exe, or build it yourself from source so your antivirus can verify it.
+
+> **Note:** The `.exe` must be built on Windows. A Windows VM (VirtualBox, VMware, etc.) works fine — install Python and pyinstaller inside it, copy the source files in, and run the build command.
 
 ---
 
@@ -177,7 +220,7 @@ Commands used by `server.py`, sourced from the [Waveshare wiki](https://www.wave
 | "Python not found" | Install Python and check "Add to PATH", then re-run install |
 | "Permission denied" on serial port (Linux) | Run `sudo usermod -aG dialout $USER`, log out and back in |
 | Browser shows "Cannot reach server" | Make sure the launch script is still running in the terminal |
-| Arm not found at launch (Windows) | Check USB cable, then re-run `install.bat` to re-detect the port |
+| Serial port not shown in launcher | Check USB cable, re-plug, then click **Refresh** in the launcher |
 | Steps accumulating on save | This was a known bug (fixed) — `T:220` does not overwrite; the server now deletes first with `T:203` |
 | Mission plays old steps after saving | Save takes ~0.15s per step — wait for the busy overlay to clear before playing |
 | Stop doesn't work immediately | The arm finishes its current step before stopping — this is by design per the firmware |
