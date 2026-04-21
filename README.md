@@ -64,7 +64,7 @@ After the first run, you can launch directly with:
 python launcher.py
 ```
 
-> **Linux note:** If you get `Permission denied` on the serial port, run `sudo usermod -aG dialout $USER` and log out and back in.
+> **Linux note:** If you get `Permission denied` on the serial port, add yourself to the serial group (`dialout` on Debian/Ubuntu/Fedora, `uucp` on Arch) and log out and back in.
 
 ### Manual dependency install
 
@@ -218,7 +218,7 @@ Commands used by `server.py`, sourced from the [Waveshare wiki](https://www.wave
 | Problem | Fix |
 |---|---|
 | "Python not found" | Install Python and check "Add to PATH", then re-run install |
-| "Permission denied" on serial port (Linux) | Run `sudo usermod -aG dialout $USER`, log out and back in |
+| "Permission denied" on serial port (Linux) | Add yourself to the serial group: `dialout` on Debian/Ubuntu/Fedora, `uucp` on Arch — then log out and back in |
 | Browser shows "Cannot reach server" | Make sure the launch script is still running in the terminal |
 | Serial port not shown in launcher | Check USB cable, re-plug, then click **Refresh** in the launcher |
 | Steps accumulating on save | This was a known bug (fixed) — `T:220` does not overwrite; the server now deletes first with `T:203` |

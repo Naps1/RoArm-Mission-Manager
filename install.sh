@@ -79,17 +79,22 @@ else
   echo " [OK] pyserial installed"
 fi
 
-# ── Linux: offer to add user to dialout group ─────────────────────────────────
+# ── Linux: offer to add user to serial group ──────────────────────────────────
 if [[ "$OSTYPE" != "darwin"* ]]; then
-  if ! groups | grep -qw dialout; then
+  if command -v pacman &>/dev/null; then
+    SERIAL_GROUP="uucp"
+  else
+    SERIAL_GROUP="dialout"
+  fi
+  if ! groups | grep -qw "$SERIAL_GROUP"; then
     echo ""
-    echo " [NOTE] Your user is not in the 'dialout' group."
+    echo " [NOTE] Your user is not in the '$SERIAL_GROUP' group."
     echo "        Without this you may get 'Permission denied' on the serial port."
-    read -rp " Add current user to dialout group? (recommended) [Y/n]: " ADD_GROUP
+    read -rp " Add current user to $SERIAL_GROUP group? (recommended) [Y/n]: " ADD_GROUP
     if [[ "${ADD_GROUP,,}" != "n" ]]; then
-      sudo usermod -aG dialout "$USER"
-      echo " [OK] Added to dialout. Log out and back in for this to take effect."
-      echo "      Or run: newgrp dialout"
+      sudo usermod -aG "$SERIAL_GROUP" "$USER"
+      echo " [OK] Added to $SERIAL_GROUP. Log out and back in for this to take effect."
+      echo "      Or run: newgrp $SERIAL_GROUP"
     fi
   fi
 fi
